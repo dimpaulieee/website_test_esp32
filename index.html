@@ -1,82 +1,337 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>OCTELL Health Dashboard</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #f4f6f8;
-      margin: 0;
-      padding: 20px;
-    }
-
-    h1 {
-      text-align: center;
-      color: #0a3d62;
-    }
-
-    .dashboard {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 20px;
-      margin-top: 30px;
-    }
-
-    .card {
-      background: white;
-      border-radius: 12px;
-      padding: 20px;
-      text-align: center;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-    }
-
-    .card h2 {
-      margin: 0;
-      font-size: 18px;
-      color: #555;
-    }
-
-    .value {
-      font-size: 36px;
-      margin-top: 10px;
-      color: #e55039;
-    }
-
-    .records {
-      margin-top: 40px;
-      background: white;
-      border-radius: 12px;
-      padding: 15px;
-    }
-
-    iframe {
-      width: 100%;
-      height: 500px;
-      border: none;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Patient Temperature Monitor</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .card {
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            border: none;
+        }
+        .card-header {
+            background: linear-gradient(to right, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            border-radius: 15px 15px 0 0 !important;
+            border: none;
+        }
+        .patient-card {
+            transition: transform 0.3s;
+            margin-bottom: 15px;
+            border-left: 5px solid #4facfe;
+        }
+        .patient-card:hover {
+            transform: translateY(-5px);
+        }
+        .temperature-high {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        .temperature-normal {
+            color: #28a745;
+            font-weight: bold;
+        }
+        .temperature-low {
+            color: #17a2b8;
+            font-weight: bold;
+        }
+        .last-updated {
+            font-size: 0.9em;
+            color: #6c757d;
+        }
+        .refresh-btn {
+            background: linear-gradient(to right, #4facfe 0%, #00f2fe 100%);
+            border: none;
+            transition: all 0.3s;
+        }
+        .refresh-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+        .stats-card {
+            background: rgba(255,255,255,0.9);
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+    </style>
 </head>
 <body>
+    <div class="container">
+        <!-- Header -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <div>
+                            <h1 class="h3 mb-0"><i class="fas fa-thermometer-half"></i> Patient Temperature Monitor</h1>
+                            <p class="mb-0">Real-time temperature tracking from ESP32 sensors</p>
+                        </div>
+                        <div>
+                            <button id="refreshBtn" class="btn btn-light refresh-btn">
+                                <i class="fas fa-sync-alt"></i> Refresh
+                            </button>
+                            <span id="lastUpdated" class="badge bg-light text-dark ms-2"></span>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-3">
+                                <div class="stats-card text-center">
+                                    <h5 class="text-muted">Total Patients</h5>
+                                    <h2 id="totalPatients" class="text-primary">0</h2>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="stats-card text-center">
+                                    <h5 class="text-muted">Normal Temp</h5>
+                                    <h2 id="normalCount" class="text-success">0</h2>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="stats-card text-center">
+                                    <h5 class="text-muted">High Temp</h5>
+                                    <h2 id="highCount" class="text-danger">0</h2>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="stats-card text-center">
+                                    <h5 class="text-muted">Last Updated</h5>
+                                    <h6 id="updateTime">--:--:--</h6>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-<h1>OCTELL – Health Monitoring Dashboard</h1>
+        <!-- Patient List -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="h5 mb-0"><i class="fas fa-users"></i> Patient Records</h3>
+                    </div>
+                    <div class="card-body">
+                        <div id="loading" class="text-center py-5">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-3">Loading patient data...</p>
+                        </div>
+                        <div id="errorAlert" class="alert alert-danger d-none" role="alert">
+                            <i class="fas fa-exclamation-triangle"></i> 
+                            <span id="errorMessage">Failed to load data</span>
+                        </div>
+                        <div id="patientList" class="row">
+                            <!-- Patient cards will be inserted here -->
+                        </div>
+                        <div id="emptyMessage" class="text-center py-5 d-none">
+                            <i class="fas fa-clipboard-list fa-3x text-muted mb-3"></i>
+                            <h4>No patient records yet</h4>
+                            <p class="text-muted">Press the button on your ESP32 to record temperatures</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
-<div class="dashboard">
-  <div class="card">
-    <h2>Temperature (°C)</h2>
-    <div class="value">LIVE</div>
-  </div>
+    <!-- Patient Card Template (Hidden) -->
+    <template id="patientTemplate">
+        <div class="col-md-6 col-lg-4">
+            <div class="card patient-card">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <h5 class="card-title mb-1">
+                                <i class="fas fa-user-circle"></i> 
+                                <span class="patient-name">Patient</span>
+                            </h5>
+                            <p class="text-muted mb-2">
+                                <i class="far fa-calendar"></i> 
+                                <span class="patient-date">Date</span> 
+                                <i class="far fa-clock ms-2"></i>
+                                <span class="patient-time">Time</span>
+                            </p>
+                        </div>
+                        <div class="text-end">
+                            <h3 class="mb-0">
+                                <span class="temperature-value">0.00</span>°C
+                            </h3>
+                            <small class="temperature-status">Status</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </template>
 
-  <div class="card">
-    <h2>Status</h2>
-    <div class="value">Normal</div>
-  </div>
-</div>
+    <script>
+        // ========== CONFIGURATION ==========
+        // Replace with your Google Apps Script URL (the NEW one from deployment)
+        const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzxhPuLo4ab8p1GnQnQ1TYa2ax3GN6TCisR_7YJeDqMLEAoF1BwjhQS365hPRemKgSn/exec';
+        
+        // Temperature thresholds
+        const TEMP_THRESHOLDS = {
+            NORMAL_MIN: 36.1,
+            NORMAL_MAX: 37.2,
+            FEVER_MIN: 37.3,
+            HIGH_FEVER: 38.0
+        };
 
-<div class="records">
-  <h2>Recorded Data</h2>
-  <iframe src="https://docs.google.com/spreadsheets/d/1Ku7IxTiqJ2MQ1y5q7AcV7w2-A-nemPbO6GYPjZRliGw/edit?usp=sharing"></iframe>
-</div>
+        // ========== FUNCTIONS ==========
+        async function fetchData() {
+            try {
+                showLoading(true);
+                hideError();
+                
+                // Add timestamp to prevent caching
+                const url = `${SCRIPT_URL}?t=${Date.now()}`;
+                
+                const response = await fetch(url);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    displayData(data);
+                    updateStats(data.patients);
+                    updateLastUpdated();
+                } else {
+                    throw new Error(data.error || 'Unknown error');
+                }
+                
+            } catch (error) {
+                showError(`Failed to load data: ${error.message}`);
+                console.error('Error:', error);
+            } finally {
+                showLoading(false);
+            }
+        }
 
+        function displayData(data) {
+            const container = document.getElementById('patientList');
+            const template = document.getElementById('patientTemplate');
+            const emptyMessage = document.getElementById('emptyMessage');
+            
+            container.innerHTML = '';
+            
+            if (!data.patients || data.patients.length === 0) {
+                emptyMessage.classList.remove('d-none');
+                return;
+            }
+            
+            emptyMessage.classList.add('d-none');
+            
+            data.patients.forEach(patient => {
+                const clone = template.content.cloneNode(true);
+                
+                // Fill in data
+                clone.querySelector('.patient-name').textContent = patient.patient;
+                clone.querySelector('.patient-date').textContent = patient.date;
+                clone.querySelector('.patient-time').textContent = patient.time;
+                
+                const tempValue = patient.temperature || 0;
+                const tempElement = clone.querySelector('.temperature-value');
+                tempElement.textContent = parseFloat(tempValue).toFixed(1);
+                
+                // Determine temperature status
+                const tempCard = clone.querySelector('.patient-card');
+                const statusElement = clone.querySelector('.temperature-status');
+                
+                if (tempValue >= TEMP_THRESHOLDS.HIGH_FEVER) {
+                    tempElement.classList.add('temperature-high');
+                    statusElement.textContent = 'High Fever';
+                    tempCard.style.borderLeftColor = '#dc3545';
+                    statusElement.className = 'temperature-status text-danger';
+                } else if (tempValue >= TEMP_THRESHOLDS.FEVER_MIN) {
+                    tempElement.classList.add('temperature-high');
+                    statusElement.textContent = 'Fever';
+                    tempCard.style.borderLeftColor = '#fd7e14';
+                    statusElement.className = 'temperature-status text-warning';
+                } else if (tempValue >= TEMP_THRESHOLDS.NORMAL_MIN) {
+                    tempElement.classList.add('temperature-normal');
+                    statusElement.textContent = 'Normal';
+                    tempCard.style.borderLeftColor = '#28a745';
+                    statusElement.className = 'temperature-status text-success';
+                } else {
+                    tempElement.classList.add('temperature-low');
+                    statusElement.textContent = 'Low';
+                    tempCard.style.borderLeftColor = '#17a2b8';
+                    statusElement.className = 'temperature-status text-info';
+                }
+                
+                container.appendChild(clone);
+            });
+        }
+
+        function updateStats(patients) {
+            let normalCount = 0;
+            let highCount = 0;
+            
+            patients.forEach(patient => {
+                const temp = patient.temperature || 0;
+                if (temp >= TEMP_THRESHOLDS.FEVER_MIN) {
+                    highCount++;
+                } else if (temp >= TEMP_THRESHOLDS.NORMAL_MIN) {
+                    normalCount++;
+                }
+            });
+            
+            document.getElementById('totalPatients').textContent = patients.length;
+            document.getElementById('normalCount').textContent = normalCount;
+            document.getElementById('highCount').textContent = highCount;
+        }
+
+        function updateLastUpdated() {
+            const now = new Date();
+            const timeString = now.toLocaleTimeString();
+            const dateString = now.toLocaleDateString();
+            
+            document.getElementById('updateTime').textContent = timeString;
+            document.getElementById('lastUpdated').textContent = `Updated: ${timeString}`;
+        }
+
+        function showLoading(show) {
+            document.getElementById('loading').style.display = show ? 'block' : 'none';
+        }
+
+        function showError(message) {
+            const errorAlert = document.getElementById('errorAlert');
+            const errorMessage = document.getElementById('errorMessage');
+            
+            errorMessage.textContent = message;
+            errorAlert.classList.remove('d-none');
+        }
+
+        function hideError() {
+            document.getElementById('errorAlert').classList.add('d-none');
+        }
+
+        // ========== INITIALIZATION ==========
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initial fetch
+            fetchData();
+            
+            // Refresh button
+            document.getElementById('refreshBtn').addEventListener('click', fetchData);
+            
+            // Auto-refresh every 30 seconds
+            setInterval(fetchData, 30000);
+        });
+    </script>
 </body>
 </html>
